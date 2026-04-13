@@ -39,7 +39,11 @@ function formatProfile(p: RelationshipProfile): string {
 }
 
 function formatMatches(
-  matches: { profile: RelationshipProfile; reason: string; suggestedMessage: string }[]
+  matches: {
+    profile: RelationshipProfile;
+    reason: string;
+    suggestedMessage: string;
+  }[]
 ): string {
   if (matches.length === 0) {
     return "No one in your contacts seems like a strong match for this. Try being more specific?";
@@ -58,7 +62,7 @@ function formatMatches(
     );
   });
 
-  lines.push('Reply with a name or number to send the message.');
+  lines.push("Reply with a name or number to send the message.");
   return lines.join("\n");
 }
 
@@ -85,14 +89,7 @@ async function main(): Promise<void> {
   }
 
   const anthropic = new Anthropic({ apiKey });
-
-  const sdk = new IMessageSDK({
-    watcher: {
-      pollInterval: 3000,
-      unreadOnly: true,
-      excludeOwnMessages: true,
-    },
-  });
+  const sdk = new IMessageSDK();
 
   console.log("[whymessage] Loading cache...");
   loadCache();
@@ -101,7 +98,7 @@ async function main(): Promise<void> {
   const contacts: Contact[] = await discoverContacts(sdk);
   console.log(`[whymessage] Found ${contacts.length} contacts`);
 
-  // Pending actions: keyed by the sender's chatId
+  // Pending actions: keyed by participant (phone/email of the user querying)
   const pendingActions = new Map<string, PendingAction>();
 
   // Build all profiles in background (cold start)
@@ -109,7 +106,7 @@ async function main(): Promise<void> {
     console.error("[whymessage] Background profile build failed:", err)
   );
 
-  // Background refresh: every 30 min, re-analyze 10 most recent stale contacts
+  // Background refresh: every 30 min, re-analyze stale profiles
   setInterval(() => {
     const staleContacts = contacts
       .filter((c) => {
@@ -128,19 +125,18 @@ async function main(): Promise<void> {
 
   console.log("[whymessage] Watching for messages...");
 
+  // Photon SDK: onDirectMessage for DMs only
   await sdk.startWatching({
-    onNewMessage: async (msg: any) => {
-      // Skip group chats and empty messages
-      if (msg.isGroupChat) return;
+    onDirectMessage: async (msg: any) => {
       if (!msg.text?.trim()) return;
 
       const text = msg.text.trim();
-      const senderChat = msg.chatId;
+      const sender = msg.participant ?? msg.chatId;
 
-      console.log(`[whymessage] Received: "${text}" from ${senderChat}`);
+      console.log(`[whymessage] Received: "${text}" from ${sender}`);
 
       try {
-        const pending = pendingActions.get(senderChat) ?? null;
+        const pending = pendingActions.get(sender) ?? null;
         const result = await classify(text, contacts, pending, anthropic);
 
         // ── Send Action (follow-up after intent match) ───────────
@@ -148,28 +144,31 @@ async function main(): Promise<void> {
           const target = findSendTarget(text, pending.matches);
           if (target) {
             await sdk.send(
-              target.profile.contact.chatId,
+              target.profile.contact.sender,
               target.suggestedMessage
             );
             const name =
               target.profile.contact.displayName ??
               target.profile.contact.sender;
             await sdk.send(
-              senderChat,
+              sender,
               `Sent to ${name}: "${target.suggestedMessage}"`
             );
-            pendingActions.delete(senderChat);
+            pendingActions.delete(sender);
             return;
           }
         }
 
         // ── Name Lookup ──────────────────────────────────────────
         if (result.mode === "name-lookup" && result.extractedName) {
-          const matched = findContactByName(contacts, result.extractedName);
+          const matched = findContactByName(
+            contacts,
+            result.extractedName
+          );
 
           if (matched.length === 0) {
             await sdk.send(
-              senderChat,
+              sender,
               `I don't have a contact named "${result.extractedName}". Try their full name?`
             );
             return;
@@ -179,29 +178,22 @@ async function main(): Promise<void> {
             const names = matched
               .map((c) => c.displayName ?? c.sender)
               .join(", ");
-            await sdk.send(
-              senderChat,
-              `Multiple matches: ${names}. Which one?`
-            );
+            await sdk.send(sender, `Multiple matches: ${names}. Which one?`);
             return;
           }
 
-          const profile = await buildProfile(
-            sdk,
-            matched[0],
-            anthropic
-          );
-          await sdk.send(senderChat, formatProfile(profile));
+          const profile = await buildProfile(sdk, matched[0], anthropic);
+          await sdk.send(sender, formatProfile(profile));
           return;
         }
 
         // ── Intent Match ─────────────────────────────────────────
         if (result.mode === "intent-match" && result.intent) {
           const matches = await matchIntent(result.intent, anthropic);
-          await sdk.send(senderChat, formatMatches(matches));
+          await sdk.send(sender, formatMatches(matches));
 
           if (matches.length > 0) {
-            pendingActions.set(senderChat, {
+            pendingActions.set(sender, {
               matches,
               expiresAt: new Date(Date.now() + 10 * 60 * 1000),
             });
@@ -211,16 +203,16 @@ async function main(): Promise<void> {
 
         // Fallback
         await sdk.send(
-          senderChat,
+          sender,
           "Send me a friend's name for their profile, or tell me what you need someone for."
         );
       } catch (err) {
         console.error("[whymessage] Error:", err);
-        await sdk.send(
-          senderChat,
-          "Something went wrong. Try again?"
-        );
+        await sdk.send(sender, "Something went wrong. Try again?");
       }
+    },
+    onError: (err: any) => {
+      console.error("[whymessage] Watcher error:", err);
     },
   });
 }

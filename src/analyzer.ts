@@ -14,37 +14,46 @@ import { profilePrompt, intentMatchPrompt } from "./prompts.js";
 
 const MODEL = "claude-sonnet-4-20250514";
 
-interface Message {
+interface RawMessage {
   text: string;
-  senderName: string;
-  timestamp: Date;
-  isFromMe: boolean;
+  participant?: string;
+  date?: string;
+  isFromMe?: boolean;
 }
 
-function formatTranscript(messages: Message[]): string {
+function formatTranscript(
+  messages: RawMessage[],
+  contactName: string
+): string {
   return messages
     .map((m) => {
-      const date = m.timestamp.toLocaleDateString("en-GB", {
-        month: "short",
-        day: "numeric",
-      });
-      const time = m.timestamp.toLocaleTimeString("en-GB", {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-      const sender = m.isFromMe ? "You" : m.senderName;
+      const date = m.date
+        ? new Date(m.date).toLocaleDateString("en-GB", {
+            month: "short",
+            day: "numeric",
+          })
+        : "";
+      const time = m.date
+        ? new Date(m.date).toLocaleTimeString("en-GB", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "";
+      const sender = m.isFromMe ? "You" : contactName;
       return `[${date} ${time}] ${sender}: ${m.text}`;
     })
+    .filter((line) => line.includes(": ") && !line.endsWith(": "))
     .join("\n");
 }
 
-function computeTimeSpan(messages: Message[]): string {
-  if (messages.length < 2) return "1 message";
-  const first = messages[0].timestamp;
-  const last = messages[messages.length - 1].timestamp;
-  const days = Math.round(
-    Math.abs(last.getTime() - first.getTime()) / (1000 * 60 * 60 * 24)
-  );
+function computeTimeSpan(messages: RawMessage[]): string {
+  const dates = messages
+    .filter((m) => m.date)
+    .map((m) => new Date(m.date!).getTime());
+  if (dates.length < 2) return "1 message";
+  const first = Math.min(...dates);
+  const last = Math.max(...dates);
+  const days = Math.round((last - first) / (1000 * 60 * 60 * 24));
   if (days < 7) return `${days} days`;
   if (days < 30) return `${Math.round(days / 7)} weeks`;
   return `${Math.round(days / 30)} months`;
@@ -55,15 +64,13 @@ export async function buildProfile(
   contact: Contact,
   anthropic: Anthropic
 ): Promise<RelationshipProfile> {
-  // Check cache first
   const cached = getCachedProfile(contact.sender);
   if (cached && !isStale(cached)) return cached;
 
-  // Fetch messages
-  const rawMessages: Message[] = await sdk.getMessages({
-    chatId: contact.chatId,
+  // Photon SDK: getMessages({ participant, limit })
+  const rawMessages: RawMessage[] = await sdk.getMessages({
+    participant: contact.sender,
     limit: 500,
-    excludeOwnMessages: false,
   });
 
   if (rawMessages.length === 0) {
@@ -82,15 +89,11 @@ export async function buildProfile(
     return empty;
   }
 
-  const transcript = formatTranscript(rawMessages);
+  const name = contact.displayName ?? contact.sender;
+  const transcript = formatTranscript(rawMessages, name);
   const timeSpan = computeTimeSpan(rawMessages);
 
-  const prompt = profilePrompt(
-    contact.displayName ?? contact.sender,
-    transcript,
-    rawMessages.length,
-    timeSpan
-  );
+  const prompt = profilePrompt(name, transcript, rawMessages.length, timeSpan);
 
   const response = await anthropic.messages.create({
     model: MODEL,
@@ -103,13 +106,15 @@ export async function buildProfile(
     response.content[0].type === "text" ? response.content[0].text : "";
   const parsed = JSON.parse(text);
 
-  const lastMsg = rawMessages[rawMessages.length - 1];
+  // Find the most recent message date
+  const dates = rawMessages
+    .filter((m) => m.date)
+    .map((m) => new Date(m.date!).getTime());
+  const lastTexted = dates.length > 0 ? new Date(Math.max(...dates)) : new Date();
 
   const profile: RelationshipProfile = {
     contact,
-    lastTexted: lastMsg?.timestamp
-      ? new Date(lastMsg.timestamp)
-      : new Date(),
+    lastTexted,
     messageCount: rawMessages.length,
     frequency: parsed.frequency,
     commonTopics: parsed.common_topics,
@@ -127,13 +132,9 @@ export async function matchIntent(
   intent: string,
   anthropic: Anthropic
 ): Promise<IntentMatch[]> {
-  const profiles = getAllProfiles().filter(
-    (p) => p.messageCount > 0
-  );
-
+  const profiles = getAllProfiles().filter((p) => p.messageCount > 0);
   if (profiles.length === 0) return [];
 
-  // Build compact summaries for the LLM
   const summaries = profiles
     .map((p) => {
       const name = p.contact.displayName ?? p.contact.sender;
@@ -166,7 +167,12 @@ export async function matchIntent(
   if (!parsed.matches || parsed.matches.length === 0) return [];
 
   return parsed.matches.map(
-    (m: { sender: string; name: string; reason: string; suggested_message: string }) => {
+    (m: {
+      sender: string;
+      name: string;
+      reason: string;
+      suggested_message: string;
+    }) => {
       const profile = profiles.find((p) => p.contact.sender === m.sender);
       return {
         profile: profile ?? profiles[0],
@@ -216,6 +222,5 @@ function relativeTime(date: Date): string {
   if (days < 7) return `${days}d ago`;
   const weeks = Math.floor(days / 7);
   if (weeks < 5) return `${weeks}w ago`;
-  const months = Math.floor(days / 30);
-  return `${months}mo ago`;
+  return `${Math.floor(days / 30)}mo ago`;
 }

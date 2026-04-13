@@ -11,7 +11,8 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
-    "@photon-ai/imessage-kit": "latest"
+    "@photon-ai/imessage-kit": "latest",
+    "better-sqlite3": "^11.0.0"
   },
   "devDependencies": {
     "typescript": "^5.7.0",

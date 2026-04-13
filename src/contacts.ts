@@ -1,46 +1,45 @@
 import type { Contact } from "./types.js";
 
-// The Photon SDK provides listChats() which returns ChatSummary objects.
-// We use this instead of a getContacts() method (which doesn't exist).
-
 export async function discoverContacts(sdk: any): Promise<Contact[]> {
-  const chats = await sdk.listChats({
-    type: "dm",
+  // listChats() returns ChatSummary with: chatId, name, kind, unreadCount
+  // Filter to DMs only (kind !== 'group')
+  const allChats = await sdk.listChats({
     sortBy: "recent",
     limit: 200,
   });
 
   const contacts: Contact[] = [];
 
-  for (const chat of chats) {
+  for (const chat of allChats) {
+    // Skip group chats — we only want 1:1 conversations
+    if (chat.kind === "group") continue;
+
+    // Extract the participant identifier from chatId
+    const sender = extractSender(chat.chatId);
+
     const contact: Contact = {
       chatId: chat.chatId,
-      sender: extractSender(chat.chatId),
-      displayName: chat.displayName ?? null,
-      lastMessageAt: chat.lastMessageAt
-        ? new Date(chat.lastMessageAt)
-        : null,
+      sender,
+      displayName: chat.name ?? null,
+      lastMessageAt: null,
     };
 
-    // Fallback: if no displayName, pull from most recent message
+    // If no display name, try to get it from the most recent message
     if (!contact.displayName) {
       const msgs = await sdk.getMessages({
-        chatId: chat.chatId,
+        participant: sender,
         limit: 1,
-        excludeOwnMessages: true,
       });
-      if (msgs.length > 0 && msgs[0].senderName) {
-        contact.displayName = msgs[0].senderName;
+      if (msgs.length > 0 && msgs[0].participant) {
+        contact.displayName = msgs[0].participant;
       }
     }
 
     contacts.push(contact);
   }
 
-  return contacts.sort(
-    (a, b) =>
-      (b.lastMessageAt?.getTime() ?? 0) - (a.lastMessageAt?.getTime() ?? 0)
-  );
+  // Sort by most recently active (we'll fill in lastMessageAt from messages)
+  return contacts;
 }
 
 export function findContactByName(

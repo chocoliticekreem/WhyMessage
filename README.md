@@ -60,25 +60,33 @@ Reply "James" or "1" and it sends the message for you.
 
 ## Setup
 
+### Prerequisites
+- **macOS only** — Photon SDK reads your local Messages database
+- **Full Disk Access** — System Settings → Privacy & Security → Full Disk Access → add your terminal (Terminal, Warp, iTerm, VS Code, Cursor)
+
+### Install
 ```bash
 cd WhyMessage
 npm install
 ```
 
+### Configure
 Create a `.env` file:
 ```
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-Run:
+### Run
 ```bash
 npm run dev
 ```
 
 The agent will:
-1. Discover your contacts via Photon SDK
-2. Build relationship profiles from your message history (cached after first run)
-3. Watch for incoming iMessages and respond
+1. Discover your iMessage contacts via Photon SDK
+2. Build relationship profiles from your conversation history (cached after first run)
+3. Watch for incoming DMs and respond
+
+Text the agent from another device or ask a friend to text you to test it.
 
 ## Architecture
 
