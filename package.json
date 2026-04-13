@@ -1,0 +1,21 @@
+{
+  "name": "whymessage",
+  "version": "0.1.0",
+  "description": "Text a friend's name to see your relationship profile. Text a need to find the right person.",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@photon-ai/imessage-kit": "latest"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "tsx": "^4.19.0",
+    "@types/node": "^22.0.0"
+  }
+}
