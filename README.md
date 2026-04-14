@@ -18,16 +18,21 @@ Two modes, one agent. Just text it.
 Text a friend's name and get your relationship profile:
 
 ```
-You: Vandit 
+You: Vandit
 
 WhyMessage:
 Vandit Kumar
 
 Last texted: 3d ago (Apr 10)
 Frequency: weekly
-Topics: bouldering, ML papers, that one ramen place 
+Topics: bouldering, ML papers, that one ramen place
 Vibe: warm and jokey
+Depth: moderate (avg 18 words/msg)
+Dynamic: balanced (48% you)
+Trend: ↑ growing
+Activity: ▁▃▅▇▅▃▁▁▃▅▇█  (12 weeks)
 Key moments: Stanford TreeHack '25 teammates; Kyoto trip May '25; started climbing together Oct '24
+Groups: Climbing Crew, Photon Residency
 
 Your go-to for nerdy deep dives and spontaneous food runs.
 ```
@@ -41,22 +46,25 @@ You: dinner tonight, somewhere chill
 WhyMessage:
 Here's who I'd reach out to:
 
-1. Vandit Kumar (weekly, last 3d ago)
+1. Vandit Kumar (weekly, last 3d ago) ↑
+   ▁▃▅▇▅▃▁▁▃▅▇█
    Why: You two talk about food constantly — he mentioned wanting to try the new Thai place last week
    Message: "vandit have you been to that thai place yet? free tonight?"
 
-2. Daniel Tian (monthly, last 5d ago)
+2. Daniel Tian (monthly, last 5d ago) →
+   ▃▃▂▁▁▁▂▃▃▂▃▃
    Why: He texted about being bored on break 3 days ago and you've done spontaneous dinners before
    Message: "yo dan you mentioned being bored.. dinner tonight? somewhere chill"
 
-3. Hugo Song (weekly, last 2d ago)
+3. Hugo Song (weekly, last 2d ago) ↑
+   ▁▁▂▃▃▅▅▃▅▆▇█
    Why: You caught up with him last week and he mentioned wanting to hang more outside events
    Message: "hugo! wanna grab food tonight? been meaning to hang outside uni stuff"
 
-Reply with a name or number to send the message.
+Reply with a number to send, or "2: your custom message" to edit.
 ```
 
-Reply "Vandit" or "1" and it sends the message for you.
+Reply "Vandit" or "1" and it sends the suggested message. Or reply "2: yo dan, thai food tonight?" to edit before sending.
 
 ## Setup
 
@@ -96,8 +104,11 @@ src/
   router.ts     → Intent detection (heuristic-first, LLM fallback)
   analyzer.ts   → LLM-powered profile building + intent matching
   contacts.ts   → Contact discovery via listChats()
+  groups.ts     → Group chat scanning + per-contact group mapping
   cache.ts      → JSON file cache at ~/.whymessage/cache.json
   prompts.ts    → All LLM prompt templates
+  utils.ts      → Shared helpers (relativeTime, safeParseJSON)
+  sdk-types.ts  → Typed interface for Photon SDK
   types.ts      → Shared TypeScript interfaces
 ```
 

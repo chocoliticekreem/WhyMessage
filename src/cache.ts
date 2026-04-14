@@ -9,6 +9,7 @@ const STALE_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 let profiles = new Map<string, RelationshipProfile>();
 let writeTimer: ReturnType<typeof setTimeout> | null = null;
+let dirty = false;
 
 export function loadCache(): Map<string, RelationshipProfile> {
   if (!fs.existsSync(CACHE_PATH)) {
@@ -28,15 +29,30 @@ export function loadCache(): Map<string, RelationshipProfile> {
   return profiles;
 }
 
+function writeToDisk(): void {
+  const obj: Record<string, RelationshipProfile> = {};
+  for (const [k, v] of profiles) obj[k] = v;
+  fs.mkdirSync(CACHE_DIR, { recursive: true });
+  fs.writeFileSync(CACHE_PATH, JSON.stringify(obj, null, 2));
+  dirty = false;
+}
+
 function scheduleSave(): void {
+  dirty = true;
   if (writeTimer) return;
   writeTimer = setTimeout(() => {
-    const obj: Record<string, RelationshipProfile> = {};
-    for (const [k, v] of profiles) obj[k] = v;
-    fs.mkdirSync(CACHE_DIR, { recursive: true });
-    fs.writeFileSync(CACHE_PATH, JSON.stringify(obj, null, 2));
+    writeToDisk();
     writeTimer = null;
   }, 2000);
+}
+
+/** Flush pending writes synchronously. Call on shutdown. */
+export function flushCache(): void {
+  if (writeTimer) {
+    clearTimeout(writeTimer);
+    writeTimer = null;
+  }
+  if (dirty) writeToDisk();
 }
 
 export function getCachedProfile(
