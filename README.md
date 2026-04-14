@@ -1,12 +1,12 @@
 # WhyMessage
 
-**Text a friend's name to see your relationship profile. Text a need to find the right person.**
+**Your relationship CRM. Text a friend's name to see relationship profile. Text a need to find the right person.**
 
-WhyMessage is an iMessage-native relationship intelligence agent built with the [Photon SDK](https://github.com/photon-hq/imessage-kit). It reads your real conversation history to build relationship profiles — and uses them to match you with the right person for anything.
+WhyMessage is an iMessage-native relationship intelligence agent built with the [Photon SDK](https://github.com/photon-hq/imessage-kit). It reads your real conversation history to build relationship profiles and uses them to match you with the right person for anything.
 
 ## The Problem
 
-You want to grab dinner but can't think of who to text. You know someone in your contacts does ML, but you can't remember who. You haven't talked to a friend in months and texting them out of the blue feels weird.
+You want to grab dinner but can't think of who to text. You know someone in your contacts who'd be down to go to the movies together, but you can't remember who. You haven't talked to a friend in months and texting them out of the blue feels weird.
 
 Your brain can recall maybe 5 people in the moment. Your iMessage history knows 200+.
 
@@ -18,16 +18,16 @@ Two modes, one agent. Just text it.
 Text a friend's name and get your relationship profile:
 
 ```
-You: James
+You: Vandit 
 
 WhyMessage:
-James Chen
+Vandit Kumar
 
 Last texted: 3d ago (Apr 10)
 Frequency: weekly
-Topics: bouldering at Vauxhall Wall, ML papers, that ramen place on High St
+Topics: bouldering, ML papers, that one ramen place 
 Vibe: warm and jokey
-Key moments: IC Hack '25 teammates; Kyoto trip May '25; started climbing together Oct '24
+Key moments: Stanford TreeHack '25 teammates; Kyoto trip May '25; started climbing together Oct '24
 
 Your go-to for nerdy deep dives and spontaneous food runs.
 ```
@@ -41,22 +41,22 @@ You: dinner tonight, somewhere chill
 WhyMessage:
 Here's who I'd reach out to:
 
-1. James Chen (weekly, last 3d ago)
+1. Vandit Kumar (weekly, last 3d ago)
    Why: You two talk about food constantly — he mentioned wanting to try the new Thai place last week
-   Message: "james have you been to that thai place on high st yet? free tonight?"
+   Message: "vandit have you been to that thai place yet? free tonight?"
 
-2. Sarah L (monthly, last 5d ago)
-   Why: She texted about being bored on break 3 days ago and you've done spontaneous dinners before
-   Message: "sarah you mentioned being bored — fancy dinner tonight? somewhere chill"
+2. Daniel Tian (monthly, last 5d ago)
+   Why: He texted about being bored on break 3 days ago and you've done spontaneous dinners before
+   Message: "yo dan you mentioned being bored.. dinner tonight? somewhere chill"
 
-3. Mike Wong (weekly, last 2d ago)
-   Why: You caught up at ICCS last week and he mentioned wanting to hang more outside events
-   Message: "mike! wanna grab food tonight? been meaning to hang outside society stuff"
+3. Hugo Song (weekly, last 2d ago)
+   Why: You caught up with him last week and he mentioned wanting to hang more outside events
+   Message: "hugo! wanna grab food tonight? been meaning to hang outside uni stuff"
 
 Reply with a name or number to send the message.
 ```
 
-Reply "James" or "1" and it sends the message for you.
+Reply "Vandit" or "1" and it sends the message for you.
 
 ## Setup
 
@@ -116,4 +116,4 @@ src/
 
 Your contacts app is dead data. Your message history is alive — full of context about who you are to each other, what you've done together, what you care about. WhyMessage is the first agent that turns those conversations into actionable relationship intelligence, right where the conversations happen.
 
-Built for the YC x Photon residency.
+Built for the Photon residency.
