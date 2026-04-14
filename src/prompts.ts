@@ -19,8 +19,12 @@ export function profilePrompt(
   contactName: string,
   transcript: string,
   messageCount: number,
-  timeSpan: string
+  timeSpan: string,
+  groupContext?: string
 ): string {
+  const groupSection = groupContext
+    ? `\n\nShared group chats: ${groupContext}\nUse group membership as additional context for topics and shared interests, but prioritize what's in the DM conversation.\n`
+    : "";
   return `You are analyzing an iMessage conversation to build a relationship profile.
 Given the conversation below between the user and ${contactName}, extract:
 
@@ -36,7 +40,7 @@ Respond with JSON only, no markdown fences:
 Do NOT invent information not present in the messages. If the conversation is sparse, say so honestly.
 
 Conversation (${messageCount} messages, spanning ${timeSpan}):
-${transcript}`;
+${transcript}${groupSection}`;
 }
 
 export function intentMatchPrompt(

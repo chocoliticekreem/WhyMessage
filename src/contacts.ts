@@ -1,8 +1,14 @@
 import type { Contact } from "./types.js";
+import type { IMessageClient, ChatSummary } from "./sdk-types.js";
 
-export async function discoverContacts(sdk: any): Promise<Contact[]> {
-  // listChats() returns ChatSummary with: chatId, name, kind, unreadCount
-  // Filter to DMs only (kind !== 'group')
+export interface DiscoverResult {
+  contacts: Contact[];
+  allChats: ChatSummary[];
+}
+
+export async function discoverContacts(
+  sdk: IMessageClient
+): Promise<DiscoverResult> {
   const allChats = await sdk.listChats({
     sortBy: "recent",
     limit: 200,
@@ -11,20 +17,17 @@ export async function discoverContacts(sdk: any): Promise<Contact[]> {
   const contacts: Contact[] = [];
 
   for (const chat of allChats) {
-    // Skip group chats — we only want 1:1 conversations
-    if (chat.kind === "group") continue;
+    if (chat.isGroup) continue;
 
-    // Extract the participant identifier from chatId
     const sender = extractSender(chat.chatId);
 
     const contact: Contact = {
       chatId: chat.chatId,
       sender,
-      displayName: chat.name ?? null,
-      lastMessageAt: null,
+      displayName: chat.displayName ?? null,
+      lastMessageAt: chat.lastMessageAt ?? null,
     };
 
-    // If no display name, try to get it from the most recent message
     if (!contact.displayName) {
       const msgs = await sdk.getMessages({
         participant: sender,
@@ -38,8 +41,7 @@ export async function discoverContacts(sdk: any): Promise<Contact[]> {
     contacts.push(contact);
   }
 
-  // Sort by most recently active (we'll fill in lastMessageAt from messages)
-  return contacts;
+  return { contacts, allChats };
 }
 
 export function findContactByName(
@@ -53,7 +55,6 @@ export function findContactByName(
 }
 
 function extractSender(chatId: string): string {
-  // Parse "iMessage;-;+1234567890" or "iMessage;-;user@example.com"
   const parts = chatId.split(";");
   return parts[parts.length - 1] ?? chatId;
 }
