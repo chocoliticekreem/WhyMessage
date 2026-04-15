@@ -85,7 +85,7 @@ npm install
 ### Configure
 Create a `.env` file:
 ```
-ANTHROPIC_API_KEY=sk-ant-...
+OPENAI_API_KEY=sk-...
 ```
 
 ### Run
@@ -118,13 +118,13 @@ src/
 
 **Classification strategy:** Heuristic rules handle the common cases (exact name match, trigger phrases like "tell me about X", no-name-found = intent). LLM classifier only fires for ambiguous inputs (name + other words). This keeps response time fast.
 
-**Caching:** Profiles are cached to `~/.whymessage/cache.json` and refreshed after 24 hours. Cold start builds all profiles in batches of 5. Background refresh runs every 30 minutes.
+**Caching:** Profiles are cached to `~/.whymessage/cache.json` and refreshed after 24 hours. Cold start builds profiles for your 50 most recently active contacts (last 90 days), skipping any already cached. Background refresh runs every 30 minutes.
 
 ## Stack
 
 - TypeScript + Node.js
 - [Photon SDK](https://github.com/photon-hq/imessage-kit) — iMessage read/write
-- [Claude API](https://docs.anthropic.com) — conversation analysis + matching
+- [OpenAI API](https://platform.openai.com) — conversation analysis + matching
 - Zero UI — everything happens in iMessage
 
 ## Why This Exists
