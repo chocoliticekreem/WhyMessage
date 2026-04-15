@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import type {
   Contact,
   Classification,
@@ -22,7 +22,7 @@ export async function classify(
   text: string,
   contacts: Contact[],
   pending: PendingAction | null,
-  anthropic: Anthropic
+  openai: OpenAI
 ): Promise<Classification> {
   const trimmed = text.trim();
   const lower = trimmed.toLowerCase();
@@ -67,13 +67,13 @@ export async function classify(
   }
 
   // Pass 5: Ambiguous (has a name + other words) -> LLM classifier
-  return classifyWithLLM(trimmed, contacts, anthropic);
+  return classifyWithLLM(trimmed, contacts, openai);
 }
 
 async function classifyWithLLM(
   text: string,
   contacts: Contact[],
-  anthropic: Anthropic
+  openai: OpenAI
 ): Promise<Classification> {
   const names = contacts
     .filter((c) => c.displayName)
@@ -81,15 +81,14 @@ async function classifyWithLLM(
 
   const prompt = classifyPrompt(text, names);
 
-  const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
+  const response = await openai.chat.completions.create({
+    model: "gpt-4.1-mini",
     max_tokens: 150,
     temperature: 0,
     messages: [{ role: "user", content: prompt }],
   });
 
-  const raw =
-    response.content[0].type === "text" ? response.content[0].text : "{}";
+  const raw = response.choices[0]?.message?.content ?? "{}";
   const parsed = safeParseJSON<{
     mode?: string;
     extractedName?: string;

@@ -55,8 +55,9 @@ export function formatGroupContext(groups: GroupMembership[]): string {
 
   return groups
     .map((g) => {
-      const active = g.lastActiveAt
-        ? `last active ${g.lastActiveAt.toLocaleDateString("en-GB", { month: "short", day: "numeric" })}`
+      const lastActiveAt = g.lastActiveAt ? new Date(g.lastActiveAt) : null;
+      const active = lastActiveAt && !isNaN(lastActiveAt.getTime())
+        ? `last active ${lastActiveAt.toLocaleDateString("en-GB", { month: "short", day: "numeric" })}`
         : "inactive";
       return `"${g.groupName}" (${g.memberCount} members, ${active})`;
     })

@@ -1,5 +1,5 @@
 import "dotenv/config";
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { IMessageSDK } from "@photon-ai/imessage-kit";
 import type { IMessageClient } from "./sdk-types.js";
 import type {
@@ -181,13 +181,13 @@ function parseEditCommand(text: string): { index: number; message: string } | nu
 // ── Main ─────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    console.error("[whymessage] ANTHROPIC_API_KEY not set. Create a .env file or export the variable.");
+    console.error("[whymessage] OPENAI_API_KEY not set. Create a .env file or export the variable.");
     process.exit(1);
   }
 
-  const anthropic = new Anthropic({ apiKey });
+  const openai = new OpenAI({ apiKey });
   const sdk = new IMessageSDK() as unknown as IMessageClient;
 
   console.log("[whymessage] Loading cache...");
@@ -204,10 +204,21 @@ async function main(): Promise<void> {
 
   const pendingActions = new Map<string, PendingAction>();
 
-  // Build all profiles in background (cold start)
-  buildAllProfiles(sdk, contacts, anthropic, groupMap).catch((err) =>
-    console.error("[whymessage] Background profile build failed:", err)
-  );
+  // Build profiles for recently active contacts only (last 90 days, cap 50)
+  const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+  const uncachedContacts = contacts
+    .filter((c) => c.lastMessageAt && c.lastMessageAt > cutoff)
+    .filter((c) => { const p = getCachedProfile(c.sender); return !p || isStale(p); })
+    .slice(0, 50);
+
+  if (uncachedContacts.length === 0) {
+    console.log("[whymessage] All profiles up to date, skipping build");
+  } else {
+    console.log(`[whymessage] Profiling ${uncachedContacts.length} uncached contacts`);
+    buildAllProfiles(sdk, uncachedContacts, openai, groupMap).catch((err) =>
+      console.error("[whymessage] Background profile build failed:", err)
+    );
+  }
 
   // Background refresh: every 30 min, re-analyze stale profiles
   const refreshInterval = setInterval(() => {
@@ -222,7 +233,7 @@ async function main(): Promise<void> {
       console.log(
         `[whymessage] Refreshing ${staleContacts.length} stale profiles...`
       );
-      buildAllProfiles(sdk, staleContacts, anthropic, groupMap).catch((err) =>
+      buildAllProfiles(sdk, staleContacts, openai, groupMap).catch((err) =>
         console.error("[whymessage] Background refresh failed:", err)
       );
     }
@@ -289,7 +300,7 @@ async function main(): Promise<void> {
           }
         }
 
-        const result = await classify(text, contacts, pending, anthropic);
+        const result = await classify(text, contacts, pending, openai);
 
         // ── Send Action (follow-up after intent match) ───────────
         if (result.mode === "send-action" && pending) {
@@ -334,14 +345,14 @@ async function main(): Promise<void> {
             return;
           }
 
-          const profile = await buildProfile(sdk, matched[0], anthropic, groupMap.get(matched[0].sender));
+          const profile = await buildProfile(sdk, matched[0], openai, groupMap.get(matched[0].sender));
           await sdk.send(sender, formatProfile(profile));
           return;
         }
 
         // ── Intent Match ─────────────────────────────────────────
         if (result.mode === "intent-match" && result.intent) {
-          const matches = await matchIntent(result.intent, anthropic);
+          const matches = await matchIntent(result.intent, openai);
           await sdk.send(sender, formatMatches(matches));
 
           if (matches.length > 0) {
@@ -360,7 +371,11 @@ async function main(): Promise<void> {
         );
       } catch (err) {
         console.error("[whymessage] Error:", err);
-        await sdk.send(sender, "Something went wrong. Try again?");
+        try {
+          await sdk.send(sender, "Something went wrong. Try again?");
+        } catch (sendErr) {
+          console.error("[whymessage] Failed to send error reply:", sendErr);
+        }
       }
     },
     onError: (err: unknown) => {

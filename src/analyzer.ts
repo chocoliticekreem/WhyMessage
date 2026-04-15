@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import type {
   Contact,
   ConversationStats,
@@ -18,7 +18,8 @@ import { profilePrompt, intentMatchPrompt } from "./prompts.js";
 import { relativeTime, safeParseJSON } from "./utils.js";
 import { formatGroupContext } from "./groups.js";
 
-const MODEL = "claude-sonnet-4-20250514";
+const PROFILE_MODEL = "gpt-4.1-mini";
+const INTENT_MODEL = "gpt-4.1-mini";
 
 function formatTranscript(
   messages: RawMessage[],
@@ -151,16 +152,22 @@ interface MatchLLMResponse {
 export async function buildProfile(
   sdk: IMessageClient,
   contact: Contact,
-  anthropic: Anthropic,
+  openai: OpenAI,
   groups?: GroupMembership[]
 ): Promise<RelationshipProfile> {
   const cached = getCachedProfile(contact.sender);
   if (cached && !isStale(cached)) return cached;
 
-  const rawMessages: RawMessage[] = await sdk.getMessages({
+  // SDK may return { messages: [...] } or a plain array depending on version
+  const raw = await sdk.getMessages({
     participant: contact.sender,
     limit: 500,
   });
+  const rawMessages: RawMessage[] = Array.isArray(raw)
+    ? raw
+    : Array.isArray((raw as { messages?: RawMessage[] }).messages)
+    ? (raw as { messages: RawMessage[] }).messages
+    : [];
 
   if (rawMessages.length === 0) {
     const empty: RelationshipProfile = {
@@ -196,15 +203,14 @@ export async function buildProfile(
     groupCtx
   );
 
-  const response = await anthropic.messages.create({
-    model: MODEL,
+  const response = await openai.chat.completions.create({
+    model: PROFILE_MODEL,
     max_tokens: 800,
     temperature: 0,
     messages: [{ role: "user", content: prompt }],
   });
 
-  const text =
-    response.content[0].type === "text" ? response.content[0].text : "";
+  const text = response.choices[0]?.message?.content ?? "";
   const parsed = safeParseJSON<ProfileLLMResponse>(text);
 
   if (!parsed) {
@@ -256,7 +262,7 @@ export async function buildProfile(
 
 export async function matchIntent(
   intent: string,
-  anthropic: Anthropic
+  openai: OpenAI
 ): Promise<IntentMatch[]> {
   const profiles = getAllProfiles().filter((p) => p.messageCount > 0);
   if (profiles.length === 0) return [];
@@ -284,15 +290,14 @@ export async function matchIntent(
 
   const prompt = intentMatchPrompt(intent, summaries);
 
-  const response = await anthropic.messages.create({
-    model: MODEL,
+  const response = await openai.chat.completions.create({
+    model: INTENT_MODEL,
     max_tokens: 600,
     temperature: 0.3,
     messages: [{ role: "user", content: prompt }],
   });
 
-  const text =
-    response.content[0].type === "text" ? response.content[0].text : "";
+  const text = response.choices[0]?.message?.content ?? "";
   const parsed = safeParseJSON<MatchLLMResponse>(text);
 
   if (!parsed?.matches || parsed.matches.length === 0) return [];
@@ -313,10 +318,10 @@ export async function matchIntent(
 export async function buildAllProfiles(
   sdk: IMessageClient,
   contacts: Contact[],
-  anthropic: Anthropic,
+  openai: OpenAI,
   groupMap?: Map<string, GroupMembership[]>
 ): Promise<void> {
-  const BATCH = 5;
+  const BATCH = 2;
   console.log(
     `[whymessage] Building profiles for ${contacts.length} contacts...`
   );
@@ -325,9 +330,9 @@ export async function buildAllProfiles(
     const batch = contacts.slice(i, i + BATCH);
     await Promise.all(
       batch.map((c) =>
-        buildProfile(sdk, c, anthropic, groupMap?.get(c.sender)).catch((err) =>
+        buildProfile(sdk, c, openai, groupMap?.get(c.sender)).catch((err) =>
           console.error(
-            `[whymessage] Failed to profile ${c.displayName}: ${err}`
+            `[whymessage] Failed to profile ${c.displayName ?? c.sender}: ${err}`
           )
         )
       )
@@ -335,6 +340,7 @@ export async function buildAllProfiles(
     console.log(
       `[whymessage] Profiled ${Math.min(i + BATCH, contacts.length)}/${contacts.length}`
     );
+    await new Promise((r) => setTimeout(r, 12000)); // 12s between batches to stay under 200k TPM
   }
 
   console.log("[whymessage] All profiles built.");

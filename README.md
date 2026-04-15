@@ -2,6 +2,10 @@
 
 **Your relationship CRM. Text a friend's name to see relationship profile. Text a need to find the right person.**
 
+## Demo
+
+[![WhyMessage Demo](https://img.shields.io/badge/Watch-Demo-red?logo=youtube)](https://youtube.com/shorts/NMugy7ytUBg?feature=share)
+
 WhyMessage is an iMessage-native relationship intelligence agent built with the [Photon SDK](https://github.com/photon-hq/imessage-kit). It reads your real conversation history to build relationship profiles and uses them to match you with the right person for anything.
 
 ## The Problem

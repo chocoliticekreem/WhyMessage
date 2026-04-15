@@ -24,6 +24,12 @@ export function loadCache(): Map<string, RelationshipProfile> {
     if (p.contact.lastMessageAt) {
       p.contact.lastMessageAt = new Date(p.contact.lastMessageAt);
     }
+    if (p.groups) {
+      p.groups = p.groups.map((g) => ({
+        ...g,
+        lastActiveAt: g.lastActiveAt ? new Date(g.lastActiveAt) : null,
+      }));
+    }
     profiles.set(key, p);
   }
   return profiles;
